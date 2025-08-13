@@ -27,11 +27,18 @@ public class EmailService {
     @Async
     public void sendSimpleEmail(String to, String subject, String body) {
         SimpleMailMessage msg = new SimpleMailMessage();
+
+        // Establece el remitente y el reply-to explícitamente:
+        msg.setFrom("difusion@jorgeslubricantes.com.mx");
+        msg.setReplyTo("noreply@jorgeslubricantes.com.mx");
+
         msg.setTo(to);
         msg.setSubject(subject);
         msg.setText(body);
+
         mailSender.send(msg);
     }
+
 
 
     @Async
@@ -44,6 +51,8 @@ public class EmailService {
         try {
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
+            helper.setFrom("difusion@jorgeslubricantes.com.mx");
+            helper.setReplyTo("noreply@jorgeslubricantes.com.mx");
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
@@ -84,6 +93,8 @@ public class EmailService {
         try {
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
+            helper.setFrom("difusion@jorgeslubricantes.com.mx");
+            helper.setReplyTo("noreply@jorgeslubricantes.com.mx");
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setText(htmlBody, true);
