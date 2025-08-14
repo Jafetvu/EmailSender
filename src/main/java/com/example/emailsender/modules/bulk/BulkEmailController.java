@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.Arrays;
 import java.util.List;
 
 @RestController
@@ -25,9 +26,10 @@ public class BulkEmailController {
     public ResponseEntity<String> sendBulk(
             @RequestParam("file") MultipartFile file,
             @RequestParam("subject") String subject,
-            @RequestParam("body") String body
+            @RequestParam("body") String body,
+            @RequestParam(value = "footer", required = false) String footer  // Nuevo parámetro opcional
     ) {
-        int count = bulkEmailService.sendBulk(file, subject, body);
+        int count = bulkEmailService.sendBulk(file, subject, body, footer != null ? footer : "");
         return ResponseEntity.ok("Enviados a " + count + " destinatarios");
     }
 
@@ -40,10 +42,11 @@ public class BulkEmailController {
             @RequestParam("file") MultipartFile excel,
             @RequestParam("subject") String subject,
             @RequestParam("body") String bodyHtml,
-            @RequestParam(value = "images", required = false) MultipartFile[] images
+            @RequestParam(value = "images", required = false) MultipartFile[] images,
+            @RequestParam(value = "footer", required = false) String footer  // Nuevo parámetro opcional
     ) {
-        List<MultipartFile> imgs = images != null ? List.of(images) : List.of();
-        int count = bulkEmailService.sendBulkInline(excel, subject, bodyHtml, imgs);
+        List<MultipartFile> imgs = images != null ? Arrays.asList(images) : List.of();
+        int count = bulkEmailService.sendBulkInline(excel, subject, bodyHtml, imgs, footer != null ? footer : "");
         return ResponseEntity.ok("Enviados a " + count + " destinatarios con imágenes inline");
     }
 
@@ -57,11 +60,15 @@ public class BulkEmailController {
             @RequestParam("subject") String subject,
             @RequestParam("body") String bodyHtml,
             @RequestParam(value = "images", required = false) MultipartFile[] images,
-            @RequestParam(value = "attachments", required = false) MultipartFile[] attachments
+            @RequestParam(value = "attachments", required = false) MultipartFile[] attachments,
+            @RequestParam(value = "footer", required = false) String footer  // Nuevo parámetro opcional
     ) {
-        List<MultipartFile> inlineImgs = images != null ? List.of(images) : List.of();
-        List<MultipartFile> attachFiles = attachments != null ? List.of(attachments) : List.of();
-        int sent = bulkEmailService.sendBulkWithAttachmentsAndInline(excel, subject, bodyHtml, inlineImgs, attachFiles);
+        List<MultipartFile> inlineImgs = images != null ? Arrays.asList(images) : List.of();
+        List<MultipartFile> attachFiles = attachments != null ? Arrays.asList(attachments) : List.of();
+        int sent = bulkEmailService.sendBulkWithAttachmentsAndInline(
+                excel, subject, bodyHtml, inlineImgs, attachFiles,
+                footer != null ? footer : ""
+        );
         return ResponseEntity.ok("Enviados a " + sent + " destinatarios");
     }
 }

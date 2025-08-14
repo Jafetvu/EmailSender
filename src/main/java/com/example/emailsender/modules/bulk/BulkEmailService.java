@@ -22,7 +22,9 @@ public class BulkEmailService {
     private final JavaMailSender mailSender;
     private final ExcelParser excelParser;
 
-    // Cambia estos valores a los que quieras usar para envíos masivos
+    // Leyenda fija implícita
+    private static final String NO_REPLY_NOTICE = "Este correo es para difusión. Por favor no responder.";
+
     private static final String BULK_FROM = "difusion@jorgeslubricantes.com.mx";
     private static final String BULK_REPLY_TO = "noreply@jorgeslubricantes.com.mx";
 
@@ -32,12 +34,17 @@ public class BulkEmailService {
     }
 
     @Async
-    public int sendBulk(MultipartFile file, String subject, String body) {
+    public int sendBulk(
+            MultipartFile file,
+            String subject,
+            String body,
+            String footer  // Nuevo parámetro footer
+    ) {
         List<String> emails = excelParser.parseEmails(file);
         int sent = 0;
         for (String to : emails) {
             if (EmailValidator.isValid(to)) {
-                sendSimpleEmail(to, subject, body);
+                sendSimpleEmail(to, subject, body, footer);
                 sent++;
             }
         }
@@ -49,13 +56,14 @@ public class BulkEmailService {
             MultipartFile excel,
             String subject,
             String bodyHtml,
-            List<MultipartFile> images
+            List<MultipartFile> images,
+            String footer  // Nuevo parámetro footer
     ) {
         List<String> recipients = excelParser.parseEmails(excel);
         int sentCount = 0;
         for (String to : recipients) {
             if (EmailValidator.isValid(to)) {
-                sendEmailWithInlineImages(to, subject, bodyHtml, images);
+                sendEmailWithInlineImages(to, subject, bodyHtml, images, footer);
                 sentCount++;
             }
         }
@@ -68,13 +76,14 @@ public class BulkEmailService {
             String subject,
             String bodyHtml,
             List<MultipartFile> inlineImages,
-            List<MultipartFile> attachments
+            List<MultipartFile> attachments,
+            String footer  // Nuevo parámetro footer
     ) {
         List<String> recipients = excelParser.parseEmails(excel);
         int sentCount = 0;
         for (String to : recipients) {
             if (EmailValidator.isValid(to)) {
-                sendEmailWithAttachmentsAndInline(to, subject, bodyHtml, inlineImages, attachments);
+                sendEmailWithAttachmentsAndInline(to, subject, bodyHtml, inlineImages, attachments, footer);
                 sentCount++;
             }
         }
@@ -83,13 +92,20 @@ public class BulkEmailService {
 
     // ---------- Métodos internos con from y replyTo propios ----------
 
-    private void sendSimpleEmail(String to, String subject, String body) {
+    private void sendSimpleEmail(String to, String subject, String body, String footer) {
+        // Construir cuerpo completo con footer opcional y leyenda fija
+        String fullBody = body;
+        if (footer != null && !footer.isEmpty()) {
+            fullBody += "\n\n" + footer;
+        }
+        fullBody += "\n\n----------------------------------------\n" + NO_REPLY_NOTICE;
+
         SimpleMailMessage msg = new SimpleMailMessage();
         msg.setFrom(BULK_FROM);
         msg.setReplyTo(BULK_REPLY_TO);
         msg.setTo(to);
         msg.setSubject(subject);
-        msg.setText(body);
+        msg.setText(fullBody);
         mailSender.send(msg);
     }
 
@@ -97,20 +113,38 @@ public class BulkEmailService {
             String to,
             String subject,
             String htmlBody,
-            List<MultipartFile> inlineImages
+            List<MultipartFile> inlineImages,
+            String footer  // Nuevo parámetro footer
     ) {
         try {
+            // Construir cuerpo HTML completo
+            StringBuilder fullHtmlBody = new StringBuilder(htmlBody);
+
+            // Añadir footer si está presente
+            if (footer != null && !footer.isEmpty()) {
+                fullHtmlBody.append("<br><br><div style='color: #666; font-size: 12px;'>")
+                        .append(footer)
+                        .append("</div>");
+            }
+
+            // Añadir leyenda fija
+            fullHtmlBody.append("<br><hr><div style='color: #999; font-style: italic; font-size: 10px;'>")
+                    .append(NO_REPLY_NOTICE)
+                    .append("</div>");
+
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
             helper.setFrom(BULK_FROM);
             helper.setReplyTo(BULK_REPLY_TO);
             helper.setTo(to);
             helper.setSubject(subject);
-            helper.setText(htmlBody, true);
+            helper.setText(fullHtmlBody.toString(), true);
 
             if (inlineImages != null) {
                 for (MultipartFile img : inlineImages) {
-                    String baseName = img.getOriginalFilename()
+                    String baseName = img.getOriginalFilename();
+                    if (baseName == null) continue;
+                    baseName = baseName
                             .replaceAll("\\s+", "")
                             .replaceAll("\\.[^.]+$", "");
                     String cid = baseName.toLowerCase();
@@ -133,16 +167,32 @@ public class BulkEmailService {
             String subject,
             String htmlBody,
             List<MultipartFile> inlineImages,
-            List<MultipartFile> attachments
+            List<MultipartFile> attachments,
+            String footer  // Nuevo parámetro footer
     ) {
         try {
+            // Construir cuerpo HTML completo
+            StringBuilder fullHtmlBody = new StringBuilder(htmlBody);
+
+            // Añadir footer si está presente
+            if (footer != null && !footer.isEmpty()) {
+                fullHtmlBody.append("<br><br><div style='color: #666; font-size: 12px;'>")
+                        .append(footer)
+                        .append("</div>");
+            }
+
+            // Añadir leyenda fija
+            fullHtmlBody.append("<br><hr><div style='color: #999; font-style: italic; font-size: 10px;'>")
+                    .append(NO_REPLY_NOTICE)
+                    .append("</div>");
+
             MimeMessage msg = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(msg, true, "UTF-8");
             helper.setFrom(BULK_FROM);
             helper.setReplyTo(BULK_REPLY_TO);
             helper.setTo(to);
             helper.setSubject(subject);
-            helper.setText(htmlBody, true);
+            helper.setText(fullHtmlBody.toString(), true);
 
             if (inlineImages != null) {
                 for (MultipartFile img : inlineImages) {
