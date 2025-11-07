@@ -1,15 +1,15 @@
 package com.example.emailsender.modules.bulk;
 
-import org.springframework.http.MediaType;
+import com.example.emailsender.modules.single.dto.SafeFileDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 @RestController
-@RequestMapping("/api/email")
+@RequestMapping("/api/email/bulk")
 public class BulkEmailController {
 
     private final BulkEmailService bulkEmailService;
@@ -18,57 +18,66 @@ public class BulkEmailController {
         this.bulkEmailService = bulkEmailService;
     }
 
-    // Envío masivo de texto plano
-    @PostMapping(
-            path = "/send/bulk",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-    )
-    public ResponseEntity<String> sendBulk(
+    @PostMapping("/send")
+    public CompletableFuture<ResponseEntity<String>> sendBulkEmails(
             @RequestParam("file") MultipartFile file,
             @RequestParam("subject") String subject,
             @RequestParam("body") String body,
-            @RequestParam(value = "footer", required = false) String footer  // Nuevo parámetro opcional
-    ) {
-        int count = bulkEmailService.sendBulk(file, subject, body, footer != null ? footer : "");
-        return ResponseEntity.ok("Enviados a " + count + " destinatarios");
+            @RequestParam(value = "footer", required = false) String footer) {
+
+        return bulkEmailService.sendBulk(file, subject, body, footer)
+                .thenApply(count -> ResponseEntity.ok("Enviados " + count + " correos exitosamente"))
+                .exceptionally(ex -> ResponseEntity.status(500).body("Error: " + ex.getMessage()));
     }
 
-    // Envío masivo con imágenes inline (HTML)
-    @PostMapping(
-            path = "/send/bulk-inline",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-    )
-    public ResponseEntity<String> sendBulkInline(
-            @RequestParam("file") MultipartFile excel,
+    @PostMapping("/send-inline")
+    public CompletableFuture<ResponseEntity<String>> sendBulkInline(
+            @RequestParam("excel") MultipartFile excel,
             @RequestParam("subject") String subject,
-            @RequestParam("body") String bodyHtml,
-            @RequestParam(value = "images", required = false) MultipartFile[] images,
-            @RequestParam(value = "footer", required = false) String footer  // Nuevo parámetro opcional
-    ) {
-        List<MultipartFile> imgs = images != null ? Arrays.asList(images) : List.of();
-        int count = bulkEmailService.sendBulkInline(excel, subject, bodyHtml, imgs, footer != null ? footer : "");
-        return ResponseEntity.ok("Enviados a " + count + " destinatarios con imágenes inline");
+            @RequestParam("bodyHtml") String bodyHtml,
+            @RequestParam(value = "images", required = false) List<MultipartFile> images,
+            @RequestParam(value = "footer", required = false) String footer) {
+
+        List<SafeFileDto> safeImages = convertToSafeFiles(images);
+
+        return bulkEmailService.sendBulkInline(excel, subject, bodyHtml, safeImages, footer)
+                .thenApply(count -> ResponseEntity.ok("Enviados " + count + " correos con imágenes exitosamente"))
+                .exceptionally(ex -> ResponseEntity.status(500).body("Error: " + ex.getMessage()));
     }
 
-    // Envío masivo con imágenes inline + adjuntos
-    @PostMapping(
-            path = "/send/bulk-advanced",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE
-    )
-    public ResponseEntity<String> sendBulkAdvanced(
-            @RequestParam("file") MultipartFile excel,
+    @PostMapping("/send-with-attachments")
+    public CompletableFuture<ResponseEntity<String>> sendBulkWithAttachments(
+            @RequestParam("excel") MultipartFile excel,
             @RequestParam("subject") String subject,
-            @RequestParam("body") String bodyHtml,
-            @RequestParam(value = "images", required = false) MultipartFile[] images,
-            @RequestParam(value = "attachments", required = false) MultipartFile[] attachments,
-            @RequestParam(value = "footer", required = false) String footer  // Nuevo parámetro opcional
-    ) {
-        List<MultipartFile> inlineImgs = images != null ? Arrays.asList(images) : List.of();
-        List<MultipartFile> attachFiles = attachments != null ? Arrays.asList(attachments) : List.of();
-        int sent = bulkEmailService.sendBulkWithAttachmentsAndInline(
-                excel, subject, bodyHtml, inlineImgs, attachFiles,
-                footer != null ? footer : ""
-        );
-        return ResponseEntity.ok("Enviados a " + sent + " destinatarios");
+            @RequestParam("bodyHtml") String bodyHtml,
+            @RequestParam(value = "inlineImages", required = false) List<MultipartFile> inlineImages,
+            @RequestParam(value = "attachments", required = false) List<MultipartFile> attachments,
+            @RequestParam(value = "footer", required = false) String footer) {
+
+        List<SafeFileDto> safeInline = convertToSafeFiles(inlineImages);
+        List<SafeFileDto> safeAttachments = convertToSafeFiles(attachments);
+
+        return bulkEmailService.sendBulkWithAttachmentsAndInline(excel, subject, bodyHtml, safeInline, safeAttachments, footer)
+                .thenApply(count -> ResponseEntity.ok("Enviados " + count + " correos con adjuntos exitosamente"))
+                .exceptionally(ex -> ResponseEntity.status(500).body("Error: " + ex.getMessage()));
+    }
+
+    // Utilidad para convertir MultipartFile -> SafeFileDto
+    private List<SafeFileDto> convertToSafeFiles(List<MultipartFile> files) {
+        if (files == null) return null;
+        List<SafeFileDto> safeFiles = new java.util.ArrayList<>();
+        for (MultipartFile f : files) {
+            try {
+                if (f.getOriginalFilename() == null) continue;
+                safeFiles.add(new SafeFileDto(
+                        f.getOriginalFilename(),
+                        f.getContentType(),
+                        f.getBytes()
+                ));
+            } catch (Exception e) {
+                throw new RuntimeException("Error leyendo archivo adjunto", e);
+            }
+        }
+        return safeFiles;
     }
 }

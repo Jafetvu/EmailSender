@@ -1,13 +1,10 @@
 package com.example.emailsender.modules.single;
 
-import com.example.emailsender.modules.single.dto.EmailRequest;
-import jakarta.validation.Valid;
+import com.example.emailsender.modules.single.dto.SafeFileDto;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import com.example.emailsender.modules.single.EmailService;
 
 import java.util.List;
 
@@ -22,7 +19,6 @@ public class EmailController {
         this.emailService = emailService;
     }
 
-    // Correo simple con parámetro footer opcional
     @PostMapping("/send")
     public ResponseEntity<String> sendSingleEmail(
             @RequestParam String to,
@@ -34,7 +30,6 @@ public class EmailController {
         return ResponseEntity.ok("Correo enviado exitosamente");
     }
 
-    // Correo con imágenes + footer opcional
     @PostMapping("/send/inline")
     public ResponseEntity<String> sendEmailWithImages(
             @RequestParam String to,
@@ -43,11 +38,11 @@ public class EmailController {
             @RequestPart(required = false) List<MultipartFile> inlineImages,
             @RequestParam(required = false) String footer) {
 
-        emailService.sendEmailWithInlineImages(to, subject, htmlBody, inlineImages, footer != null ? footer : "");
+        List<SafeFileDto> safeInline = convertToSafeFiles(inlineImages);
+        emailService.sendEmailWithInlineImages(to, subject, htmlBody, safeInline, footer != null ? footer : "");
         return ResponseEntity.ok("Correo con imágenes enviado");
     }
 
-    // Correo completo + footer opcional
     @PostMapping("/send/advanced")
     public ResponseEntity<String> sendFullEmail(
             @RequestParam String to,
@@ -57,14 +52,31 @@ public class EmailController {
             @RequestPart(required = false) List<MultipartFile> attachments,
             @RequestParam(required = false) String footer) {
 
+        List<SafeFileDto> safeInline = convertToSafeFiles(inlineImages);
+        List<SafeFileDto> safeAttachments = convertToSafeFiles(attachments);
+
         emailService.sendEmailWithAttachmentsAndInline(
                 to,
                 subject,
                 htmlBody,
-                inlineImages,
-                attachments,
+                safeInline,
+                safeAttachments,
                 footer != null ? footer : ""
         );
         return ResponseEntity.ok("Correo completo enviado");
+    }
+
+    private List<SafeFileDto> convertToSafeFiles(List<MultipartFile> files) {
+        if (files == null) return null;
+        List<SafeFileDto> safe = new java.util.ArrayList<>();
+        for (MultipartFile f : files) {
+            try {
+                if (f.getOriginalFilename() == null) continue;
+                safe.add(new SafeFileDto(f.getOriginalFilename(), f.getContentType(), f.getBytes()));
+            } catch (Exception e) {
+                throw new RuntimeException("Error leyendo archivo adjunto", e);
+            }
+        }
+        return safe;
     }
 }
