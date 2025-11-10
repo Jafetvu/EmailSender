@@ -3,6 +3,7 @@ package com.example.emailsender.modules.bulk;
 import com.example.emailsender.modules.bulk.parser.ExcelParser;
 import com.example.emailsender.modules.single.dto.SafeFileDto;
 import com.example.emailsender.utils.validation.EmailValidator;
+import com.example.emailsender.modules.tracking.EmailTrackingService;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
@@ -28,6 +29,7 @@ public class BulkEmailService {
     private final JavaMailSender mailSender;
     private final ExcelParser excelParser;
     private final EmailTemplateCache templateCache;
+    private final EmailTrackingService trackingService;
 
     private static final String NO_REPLY_NOTICE = "Este correo es para difusión. Por favor no responder.";
     private static final String BULK_FROM = "difusion@jorgeslubricantes.com.mx";
@@ -35,10 +37,12 @@ public class BulkEmailService {
 
     public BulkEmailService(JavaMailSender mailSender,
                             ExcelParser excelParser,
-                            EmailTemplateCache templateCache) {
+                            EmailTemplateCache templateCache,
+                            EmailTrackingService trackingService) {
         this.mailSender = mailSender;
         this.excelParser = excelParser;
         this.templateCache = templateCache;
+        this.trackingService = trackingService;
     }
 
     // ================== DTO interno cacheable ==================
@@ -195,7 +199,11 @@ public class BulkEmailService {
         helper.setReplyTo(BULK_REPLY_TO);
         helper.setTo(to);
         helper.setSubject(template.getSubject());
-        helper.setText(template.getFullHtmlBody(), true);
+
+        // añade el píxel de seguimiento al cuerpo HTML para cada destinatario
+        String bodyWithPixel = template.getFullHtmlBody()
+                + trackingService.generateTrackingPixel(to);
+        helper.setText(bodyWithPixel, true);
 
         // Inline
         if (template.getInlineImages() != null && !template.getInlineImages().isEmpty()) {

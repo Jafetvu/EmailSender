@@ -8,6 +8,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * Controlador REST para operaciones de envío de correos masivos.
+ */
 @RestController
 @RequestMapping("/api/email/bulk")
 public class BulkEmailController {
@@ -18,6 +21,9 @@ public class BulkEmailController {
         this.bulkEmailService = bulkEmailService;
     }
 
+    /**
+     * Envía correos de texto plano a una lista de destinatarios extraída del Excel.
+     */
     @PostMapping("/send")
     public CompletableFuture<ResponseEntity<String>> sendBulkEmails(
             @RequestParam("file") MultipartFile file,
@@ -30,6 +36,9 @@ public class BulkEmailController {
                 .exceptionally(ex -> ResponseEntity.status(500).body("Error: " + ex.getMessage()));
     }
 
+    /**
+     * Envía correos HTML con imágenes inline a una lista de destinatarios.
+     */
     @PostMapping("/send-inline")
     public CompletableFuture<ResponseEntity<String>> sendBulkInline(
             @RequestParam("excel") MultipartFile excel,
@@ -45,6 +54,9 @@ public class BulkEmailController {
                 .exceptionally(ex -> ResponseEntity.status(500).body("Error: " + ex.getMessage()));
     }
 
+    /**
+     * Envía correos HTML con imágenes inline y adjuntos.
+     */
     @PostMapping("/send-with-attachments")
     public CompletableFuture<ResponseEntity<String>> sendBulkWithAttachments(
             @RequestParam("excel") MultipartFile excel,
